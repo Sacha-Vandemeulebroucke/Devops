@@ -1,0 +1,120 @@
+name: CI/CD
+
+on:
+  push:
+    branches: 
+      - main
+
+
+env:
+  REGISTRY: ghcr.io
+  PREFIX: ${{ github.repository }}
+  # On définit le chemin vers ton projet pour éviter les répétitions
+  BASE_PATH: ./Downloads/devops-project-v3_tar/devops-simple
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    strategy:
+      matrix:
+        # Vérifie que ces noms correspondent exactement aux dossiers dans devops-simple/
+        component: [api, proxy, worker]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Métadonnées de l'image
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Login GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          # --- MODIFICATION ICI : On pointe vers le bon sous-dossier ---
+          context: ${{ env.BASE_PATH }}/${{ matrix.component }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Scan Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          # On scanne l'image qu'on vient de builder
+          image-ref: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}:sha-${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.component }}.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload résultats sécurité
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-${{ matrix.component }}.sarif
+
+      - name: Générer SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}:sha-${{ github.sha }}
+          format: cyclonedx-json
+          output-file: sbom-${{ matrix.component }}.json
+
+      - name: Sauvegarder SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.component }}
+          path: sbom-${{ matrix.component }}.json
+          retention-days: 90
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # --- MODIFICATION ICI : On définit le dossier de travail pour tout le job ---
+    defaults:
+      run:
+        working-directory: ./Downloads/devops-project-v3_tar/devops-simple
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Démarrer la stack
+        run: |
+          # Si tu n'as pas de .env.example, assure-toi que cette ligne ne fait pas planter le job
+          [ -f .env.example ] && cp .env.example .env || echo "No .env.example found"
+          docker compose up -d
+          sleep 15
+
+      - name: Tests d'intégration
+        run: |
+          # Si tes tests sont en Python, assure-toi que les dépendances sont là
+          if [ -f tests/integration_test.py ]; then
+            python3 tests/integration_test.py
+          else
+            echo "Fichier de test non trouvé, passage..."
+          fi
+
+      - name: Logs si échec
+        if: failure()
+        run: docker compose logs
+
+      - name: Arrêter la stack
+        if: always()
+        run: docker compose down -v
