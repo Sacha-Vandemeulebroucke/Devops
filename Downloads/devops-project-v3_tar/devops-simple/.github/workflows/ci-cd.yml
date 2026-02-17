@@ -1,10 +1,6 @@
 name: CI/CD
 
-on:
-  push:
-    branches: 
-    - pj
-
+on: [push, pull_request, workflow_dispatch]
 
 env:
   REGISTRY: ghcr.io
