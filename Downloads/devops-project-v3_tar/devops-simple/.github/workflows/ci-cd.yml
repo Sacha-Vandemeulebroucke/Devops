@@ -2,10 +2,8 @@ name: CI/CD
 
 on:
   push:
-    branches: [pj]
-    tags: ['v*.*.*']
-  pull_request:
-    branches: [pj]
+    branches: 
+    - pj
 
 
 env:
