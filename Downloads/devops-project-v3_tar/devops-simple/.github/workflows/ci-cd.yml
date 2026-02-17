@@ -16,7 +16,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: readgit
+      contents: read
       packages: write
       security-events: write
 
