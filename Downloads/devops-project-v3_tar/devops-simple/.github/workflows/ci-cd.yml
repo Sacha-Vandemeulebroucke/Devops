@@ -2,28 +2,28 @@ name: CI/CD
 
 on:
   push:
-    branches: 
-      -main
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
 
 
 env:
   REGISTRY: ghcr.io
-  PREFIX: ${{ github.repository }}
-  # On définit le chemin vers ton projet pour éviter les répétitions
-  BASE_PATH: ./Downloads/devops-project-v3_tar/devops-simple
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: readgit
       packages: write
       security-events: write
 
     strategy:
       matrix:
         # Vérifie que ces noms correspondent exactement aux dossiers dans devops-simple/
-        component: [api, proxy, worker]
+        component: [api, frontend, proxy, worker]
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}
           tags: |
             type=semver,pattern={{version}}
             type=sha,prefix=sha-
@@ -50,7 +50,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           # --- MODIFICATION ICI : On pointe vers le bon sous-dossier ---
-          context: ${{ env.BASE_PATH }}/${{ matrix.component }}
+          context: ./${{ matrix.component }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -59,7 +59,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           # On scanne l'image qu'on vient de builder
-          image-ref: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}:sha-${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:sha-${{ github.sha }}
           format: sarif
           output: trivy-${{ matrix.component }}.sarif
           severity: CRITICAL,HIGH
@@ -73,7 +73,7 @@ jobs:
       - name: Générer SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ env.PREFIX }}-${{ matrix.component }}:sha-${{ github.sha }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:sha-${{ github.sha }}
           format: cyclonedx-json
           output-file: sbom-${{ matrix.component }}.json
 
@@ -90,26 +90,22 @@ jobs:
     # --- MODIFICATION ICI : On définit le dossier de travail pour tout le job ---
     defaults:
       run:
-        working-directory: ./Downloads/devops-project-v3_tar/devops-simple
+        working-directory: ./
 
     steps:
       - uses: actions/checkout@v4
 
+# Étape 5 : Lancer les tests d'intégration
       - name: Démarrer la stack
         run: |
-          # Si tu n'as pas de .env.example, assure-toi que cette ligne ne fait pas planter le job
-          [ -f .env.example ] && cp .env.example .env || echo "No .env.example found"
-          docker compose up -d
-          sleep 15
+          cp .env.example .env
+          # On force le build local pour les tests d'intégration en CI
+          docker compose up -d --build
+          # Attente que les healthchecks passent
+          sleep 20
 
       - name: Tests d'intégration
-        run: |
-          # Si tes tests sont en Python, assure-toi que les dépendances sont là
-          if [ -f tests/integration_test.py ]; then
-            python3 tests/integration_test.py
-          else
-            echo "Fichier de test non trouvé, passage..."
-          fi
+        run: python tests/integration_test.py
 
       - name: Logs si échec
         if: failure()
