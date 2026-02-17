@@ -2,10 +2,9 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch: # Ajouté pour pouvoir le lancer manuellement
+    branches: 
+      -main
+
 
 env:
   REGISTRY: ghcr.io
