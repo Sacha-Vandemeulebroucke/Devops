@@ -426,15 +426,6 @@
             <option value="400">400 × 400</option>
           </select>
         </div>
-        <div class="option-group">
-          <label for="ec-select">Correction d'erreur</label>
-          <select id="ec-select">
-            <option value="L">L — 7%</option>
-            <option value="M" selected>M — 15%</option>
-            <option value="Q">Q — 25%</option>
-            <option value="H">H — 30%</option>
-          </select>
-        </div>
       </div>
 
       <div class="qr-section" id="qr-section">
@@ -450,10 +441,6 @@
       </div>
     </div>
   </main>
-
-  <footer>
-    QRGen — Générateur de QR codes &nbsp;·&nbsp; Construit avec Docker &amp; Nginx
-  </footer>
 
 </div>
 
@@ -498,8 +485,6 @@
 
     const url = normalizeURL(raw);
     const size = parseInt(document.getElementById('size-select').value);
-    const ec = document.getElementById('ec-select').value;
-    const ecMap = { L: QRCode.CorrectLevel.L, M: QRCode.CorrectLevel.M, Q: QRCode.CorrectLevel.Q, H: QRCode.CorrectLevel.H };
 
     // Clear previous
     const container = document.getElementById('qrcode');
@@ -512,7 +497,7 @@
       height: size,
       colorDark: '#0a0a0f',
       colorLight: '#ffffff',
-      correctLevel: ecMap[ec]
+      correctLevel: QRCode.CorrectLevel.M
     });
 
     document.getElementById('qr-url').textContent = url;

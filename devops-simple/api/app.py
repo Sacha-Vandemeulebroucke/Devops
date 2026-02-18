@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 VERSION = os.getenv("APP_VERSION", "1.0.0")
 
-@app.route("/")
+@app.route("/welcome")
 def index():
     return jsonify({"message": "Bienvenue sur l'API", "version": VERSION, "status": "running"}), 200
 
