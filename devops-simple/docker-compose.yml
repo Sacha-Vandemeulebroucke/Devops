@@ -46,6 +46,11 @@ services:
     networks:
       - frontend
       - backend
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_started
 
   worker:
     build: ./worker
