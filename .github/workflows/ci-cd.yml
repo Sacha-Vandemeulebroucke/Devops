@@ -17,6 +17,7 @@ jobs:
     strategy:
       matrix:
         component: [api, frontend, proxy, worker]
+      fail-fast: false  # Continue les autres jobs même si un échoue
 
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +65,7 @@ jobs:
 
       - name: Générer SBOM
         uses: anchore/sbom-action@v0
+        continue-on-error: true
         with:
           image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.component }}:sha-${{ github.sha }}
           format: cyclonedx-json
@@ -71,6 +73,7 @@ jobs:
 
       - name: Sauvegarder SBOM
         uses: actions/upload-artifact@v4
+        if: always() && hashFiles(format('sbom-{0}.json', matrix.component)) != ''
         with:
           name: sbom-${{ matrix.component }}
           path: sbom-${{ matrix.component }}.json
