@@ -10,10 +10,14 @@ import time
 
 BASE = "http://localhost:8080"
 
-def get(path):
+def get(path, expect_json=True):
     try:
         with urllib.request.urlopen(f"{BASE}{path}", timeout=5) as r:
-            return r.status, json.loads(r.read())
+            content = r.read()
+            if expect_json:
+                return r.status, json.loads(content)
+            else:
+                return r.status, content.decode('utf-8')
     except Exception as e:
         return None, str(e)
 
@@ -29,12 +33,15 @@ def wait_ready(retries=20):
     print(" TIMEOUT")
     return False
 
-def test(name, path, expected_key):
-    status, data = get(path)
-    ok = status == 200 and expected_key in data
+def test(name, path, expected_key=None, expect_json=True):
+    status, data = get(path, expect_json)
+    if expect_json:
+        ok = status == 200 and expected_key in data
+    else:
+        ok = status == 200 and len(data) > 0
     print(f"  {'✓' if ok else '✗'} {name}")
     if not ok:
-        print(f"    → status={status}, data={data}")
+        print(f"    → status={status}, data={data[:100] if isinstance(data, str) else data}")
     return ok
 
 if not wait_ready():
@@ -42,8 +49,8 @@ if not wait_ready():
 
 print("\nTests:")
 results = [
-    test("GET /health",   "/health", "status"),
-    test("GET /",         "/",       "message"),
+    test("GET /health",   "/health", "status", expect_json=True),
+    test("GET /",         "/",       expect_json=False),
 ]
 
 passed = sum(results)

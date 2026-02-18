@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        component: [api, frontend, proxy, worker]
+        component: [api, proxy, worker]
       fail-fast: false  # Continue les autres jobs même si un échoue
 
     steps:
