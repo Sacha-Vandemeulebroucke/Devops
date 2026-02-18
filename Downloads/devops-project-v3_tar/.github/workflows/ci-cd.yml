@@ -44,7 +44,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           # --- MODIFICATION ICI : On pointe vers le bon sous-dossier ---
-          context: ./${{ matrix.component }}
+          context: ./devops-simple/${{ matrix.component }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -84,7 +84,7 @@ jobs:
     # --- MODIFICATION ICI : On définit le dossier de travail pour tout le job ---
     defaults:
       run:
-        working-directory: ./
+        working-directory: ./devops-simple
 
     steps:
       - uses: actions/checkout@v4
